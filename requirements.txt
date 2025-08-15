@@ -1,6 +1,6 @@
-pandas
-numpy
-matplotlib
-tensorflow
-scikit-learn
 yfinance
+numpy
+pandas
+matplotlib
+scikit-learn
+tensorflow

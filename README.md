@@ -1,16 +1,15 @@
 # LSTM BTC Volatility Tuning
 
-This project experiments with LSTM models to forecast Bitcoin volatility using minute-level price data.
-We apply techniques like Batch Normalization, Dropout, and hyperparameter tuning.
+A compact, reproducible notebook that:
+1) Pulls BTC-USD prices (Yahoo Finance),
+2) Builds a supervised dataset from realized volatility,
+3) Trains an LSTM with dropout & batch normalization,
+4) Evaluates and plots predictions.
 
-## Installation
+## Environment Setup
 ```bash
+python -m venv .venv
+source .venv/bin/activate   # For Git Bash on Windows
 pip install -r requirements.txt
-```
-
-## Usage
-1. Open `lstm_vol_tuning.ipynb` in Jupyter or VS Code.
-2. Run the cells in order.
-
-## License
-MIT License
+# Run Jupyter
+jupyter notebook
