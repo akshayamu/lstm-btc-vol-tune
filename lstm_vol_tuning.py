@@ -1,111 +1,153 @@
-#!/usr/bin/env python
-# coding: utf-8
+import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
-# In[19]:
-
-
-import pandas as pd
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-import yfinance as yf
+
+from binance.client import Client
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error
+
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
-
-plt.style.use("seaborn-v0_8-darkgrid")
-
-
-# In[20]:
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.optimizers import Adam
 
 
-# Download last 60 days of 5-min BTC-USD data
-df = yf.download("BTC-USD", period="60d", interval="5m")
-df = df[['Close']].dropna()
-df.head()
+# -----------------------------
+# 1. Data Loading
+# -----------------------------
+client = Client()
+
+klines = client.get_historical_klines(
+    "BTCUSDT",
+    Client.KLINE_INTERVAL_1HOUR,
+    "1 Jan, 2019"
+)
+
+df = pd.DataFrame(klines, columns=[
+    "timestamp", "open", "high", "low", "close", "volume",
+    "close_time", "qav", "num_trades",
+    "taker_base_vol", "taker_quote_vol", "ignore"
+])
+
+df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+df["close"] = df["close"].astype(float)
+
+df = df[["timestamp", "close"]]
 
 
-# In[21]:
+# -----------------------------
+# 2. Feature Engineering
+# -----------------------------
+df["log_return"] = np.log(df["close"] / df["close"].shift(1))
+
+# 24h realized volatility
+df["volatility"] = df["log_return"].rolling(window=24).std()
+df = df.dropna().reset_index(drop=True)
 
 
-# Calculate rolling volatility (std dev of returns)
-df['Returns'] = df['Close'].pct_change()
-df['Volatility'] = df['Returns'].rolling(window=12).std()  # ~1 hour window
-df = df.dropna()
+# -----------------------------
+# 3. Train / Test Split
+# -----------------------------
+train_df = df[df["timestamp"] < "2024-01-01"]
+test_df  = df[df["timestamp"] >= "2024-01-01"]
 
-plt.figure(figsize=(12,4))
-plt.plot(df['Volatility'])
-plt.title("BTC Rolling Volatility")
-plt.show()
-
-
-# In[22]:
+train_vol = train_df[["volatility"]]
+test_vol  = test_df[["volatility"]]
 
 
+# -----------------------------
+# 4. Scaling (No Leakage)
+# -----------------------------
 scaler = MinMaxScaler()
-scaled_vol = scaler.fit_transform(df[['Volatility']])
-
-X, y = [], []
-lookback = 24  # 2 hours of history
-
-for i in range(lookback, len(scaled_vol)):
-    X.append(scaled_vol[i-lookback:i, 0])
-    y.append(scaled_vol[i, 0])
-
-X, y = np.array(X), np.array(y)
-X = np.reshape(X, (X.shape[0], X.shape[1], 1))  # LSTM expects 3D
-
-split = int(len(X) * 0.8)
-X_train, X_test = X[:split], X[split:]
-y_train, y_test = y[:split], y[split:]
-
-X_train.shape, X_test.shape
+train_scaled = scaler.fit_transform(train_vol)
+test_scaled  = scaler.transform(test_vol)
 
 
+# -----------------------------
+# 5. Sequence Builder
+# -----------------------------
+def create_sequences(data, lookback=48):
+    X, y = [], []
+    for i in range(lookback, len(data)):
+        X.append(data[i - lookback:i, 0])
+        y.append(data[i, 0])
+    return np.array(X), np.array(y)
 
-# In[24]:
+LOOKBACK = 48
+
+X_train, y_train = create_sequences(train_scaled, LOOKBACK)
+X_test, y_test   = create_sequences(test_scaled, LOOKBACK)
+
+X_train = X_train.reshape(X_train.shape[0], LOOKBACK, 1)
+X_test  = X_test.reshape(X_test.shape[0], LOOKBACK, 1)
 
 
+# -----------------------------
+# 6. Baseline Model
+# -----------------------------
+baseline_pred = (
+    test_vol["volatility"]
+    .rolling(24)
+    .mean()
+    .iloc[LOOKBACK:]
+    .values
+)
+
+baseline_actual = test_vol["volatility"].iloc[LOOKBACK:].values
+baseline_rmse = np.sqrt(mean_squared_error(baseline_actual, baseline_pred))
+
+
+# -----------------------------
+# 7. LSTM Model
+# -----------------------------
 model = Sequential([
-    LSTM(50, return_sequences=True, input_shape=(X_train.shape[1], 1)),
-    BatchNormalization(),
-    Dropout(0.2),
-    LSTM(50, return_sequences=False),
-    BatchNormalization(),
+    LSTM(64, input_shape=(LOOKBACK, 1)),
     Dropout(0.2),
     Dense(1)
 ])
 
-model.compile(optimizer='adam', loss='mse')
-history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=5, batch_size=32)
+model.compile(
+    optimizer=Adam(learning_rate=1e-3),
+    loss="mse"
+)
+
+model.fit(
+    X_train,
+    y_train,
+    epochs=15,
+    batch_size=32,
+    validation_data=(X_test, y_test),
+    verbose=1
+)
 
 
-# In[25]:
+# -----------------------------
+# 8. Evaluation
+# -----------------------------
+pred_scaled = model.predict(X_test)
+pred_vol = scaler.inverse_transform(pred_scaled)
+actual_vol = scaler.inverse_transform(y_test.reshape(-1, 1))
+
+lstm_rmse = np.sqrt(mean_squared_error(actual_vol, pred_vol))
+
+print(f"Baseline RMSE: {baseline_rmse:.6f}")
+print(f"LSTM RMSE:     {lstm_rmse:.6f}")
 
 
-preds = model.predict(X_test)
-preds = scaler.inverse_transform(preds.reshape(-1, 1))
-actual = scaler.inverse_transform(y_test.reshape(-1, 1))
-
-plt.figure(figsize=(12,4))
-plt.plot(actual, label="Actual Volatility")
-plt.plot(preds, label="Predicted Volatility")
+# -----------------------------
+# 9. Visualization
+# -----------------------------
+plt.figure(figsize=(12, 4))
+plt.plot(actual_vol, label="Actual Volatility")
+plt.plot(pred_vol, label="LSTM Forecast")
+plt.title("BTC 24h Realized Volatility Forecast")
 plt.legend()
+plt.tight_layout()
+plt.savefig("assets/vol_forecast.png", dpi=150)
 plt.show()
 
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
 
 
 
