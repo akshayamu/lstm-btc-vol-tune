@@ -30,3 +30,14 @@ warnings.warn(
 # Images not explicitly tracked
 *.PNG
 *.png
+# Jupyter / checkpoints
+.ipynb_checkpoints/
+
+# Local scratch / accidental files
+)
+^
+~~~~~~~~~~~~~~~~~*
+lstm-btc-vol-tune/
+
+# One-off scripts not part of repo
+data/fetch_btc_ohlcv.py
