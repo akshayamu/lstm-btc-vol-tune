@@ -1,7 +1,32 @@
+# Python
+.venv/
+venv/
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.ipynb_checkpoints/
-.env
+
+# OS / editor junk
 .DS_Store
+Thumbs.db
+
+# Data & logs (optional: keep only if you want)
+logs/
+data/btc_ohlcv_1h.csv
+
+# Temporary / accidental files
+2025-12-16
+File
+Traceback
+df
+handle
+newline
+parser
+return
+self._engine
+self.handles
+storage_options
+warnings.warn(
+^
+
+# Images not explicitly tracked
+*.PNG
+*.png
