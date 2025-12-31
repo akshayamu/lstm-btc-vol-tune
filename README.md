@@ -98,6 +98,13 @@ This repository demonstrates the **full ML lifecycle**: data ingestion, feature 
 The project is designed to resemble a **production ML workflow**, not just an experiment.
 
 ---
+## Latency & Cost Considerations
+
+The volatility forecasting system is designed for offline training and batch inference.
+
+- Model training is performed offline and does not impact runtime latency.
+- Inference is executed in batch mode with predictable compute cost.
+- Monitoring and drift detection are decoupled from inference to ensure stability and reproducibility.
 
 ## Data
 
