@@ -41,3 +41,4 @@ lstm-btc-vol-tune/
 
 # One-off scripts not part of repo
 data/fetch_btc_ohlcv.py
+baseline.json
