@@ -246,3 +246,10 @@ Data versioning with DVC
 
 Deployment as a scheduled batch job or API
 aee34e7 (Add LSTM BTC volatility model with batch monitoring and drift reports)
+## System Architecture
+
+This project is designed as a decision-oriented volatility forecasting system
+where model outputs are translated into risk-aware actions and evaluated
+based on impact metrics.
+
+![Volatility Decision Architecture](diagrams/volatility_decision_architecture.png)
