@@ -1,4 +1,4 @@
- HEAD
+ 
 # LSTM BTC Volatility Tune
 Project Summary
 BTC 24h Realized Volatility Forecasting (LSTM)
@@ -7,6 +7,12 @@ This project forecasts 24-hour realized volatility of Bitcoin (BTC) using an LST
 The model is trained on data from 2019-01-01 to 2023-12-31 and evaluated on a strictly out-of-sample test period from 2024-01-01 to 2024-12-31.
 
 The target variable is 24-hour realized volatility, defined as the rolling standard deviation of log returns. Model performance is benchmarked against a statistical baseline based on rolling average volatility.
+## Overview
+
+This project implements a volatility forecasting and decision system for BTC markets.
+Model predictions are explicitly converted into risk-aware decisions and evaluated based
+on impact metrics such as drawdown, exposure, and stability, rather than prediction accuracy alone.
+
 
 Results:
 Baseline RMSE = 0.001323
